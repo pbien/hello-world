@@ -1,0 +1,266 @@
+
+select *, row_number() over (partition by player_code, contract_level order by basesalary desc) as rn
+into #tmp_contracts
+from tblContracts_Detail
+where contract_year = 2017
+
+drop table #tmp_xxd
+drop table #tmp_recs
+drop table #tmp_recs_all
+drop table #tmp_release
+
+-- XXD/XIA
+SELECT     t2.first_name, t2.last_name, t2.player_code, 'Minor League' AS fa_type, t1.trans_date
+into #tmp_xxd
+FROM         tblTransactions t1, vwPlayer_pro_full t2
+WHERE     (t1.trans_code = 'FAXXD' OR
+                      t1.trans_code = 'FAXIA' OR
+                      t1.trans_code = 'FADML'
+					  or t1.trans_code = 'FAXAC') AND t1.trans_date > '8/1/2017' AND t2.player_code = t1.player_code AND t2.current_org = 'Independent'
+
+-- XXD/XIA
+SELECT     t2.first_name, t2.last_name, t2.player_code, 'Minor League' AS fa_type, t1.trans_date
+into #tmp_release
+FROM         tblTransactions t1, vwPlayer_pro_full t2
+WHERE     (t1.trans_code = 'RELES' OR
+                      t1.trans_code = 'UNCRL') AND t1.trans_date > '8/1/2017' AND t2.player_code = t1.player_code AND t2.current_org = 'Independent'
+
+
+select player_code, scout_code, row_number() over (partition by player_code order by scout_code) as rn
+into #tmp_recs
+from vwPref_list_pro_full_fa
+where fa_type = 'Minor League'
+and year(report_date) = 2017
+and recommend_flag = 'Y'
+
+select t.player_code, 
+t.scout_code + case when t2.scout_code is not null then ' | ' + t2.scout_code else '' end +
+case when t3.scout_code is not null then ' | ' + t3.scout_code else '' end +
+case when t4.scout_code is not null then ' | ' + t4.scout_code else '' end +
+case when t5.scout_code is not null then ' | ' + t5.scout_code else '' end +
+case when t6.scout_code is not null then ' | ' + t6.scout_code else '' end +
+case when t7.scout_code is not null then ' | ' + t7.scout_code else '' end as recs
+into #tmp_recs_all
+from #tmp_recs t left outer join #tmp_recs t2 on (t.player_code = t2.player_code and t2.rn = 2)
+left outer join #tmp_recs t3 on (t.player_code = t3.player_code and t3.rn = 3)
+left outer join #tmp_recs t4 on (t.player_code = t4.player_code and t4.rn = 4)
+left outer join #tmp_recs t5 on (t.player_code = t5.player_code and t5.rn = 5)
+left outer join #tmp_recs t6 on (t.player_code = t6.player_code and t6.rn = 6)
+left outer join #tmp_recs t7 on (t.player_code = t7.player_code and t7.rn = 7)
+where t.rn = 1
+
+-- ALL HITTERS
+drop table #tmp_hitters_stats
+
+select 
+--rank() over (partition by case when v2.position_code = 'C' then 2
+--when v2.position_code = '1B' then 3
+--when v2.position_code = '2B' then 4
+--when v2.position_code = '3B' then 5
+--when v2.position_code = 'SS' then 6
+--when v2.position_code = 'LF' then 7
+--when v2.position_code = 'CF' then 8
+--when v2.position_code = 'RF' then 9
+--else 10 end order by case when pref_no is null then 9999 else pref_no end) as pref_rk,
+v2.last_name + ', ' + v2.first_name AS PLAYER, v2.player_code, v2.position_code, 
+--case when t40.player_code is not null then 'XXD' 
+--when t42.player_code is not null then 'REL'
+--else '6 Yr' end as fa_type, 
+--case when t40.trans_date is not null then t40.trans_date
+--when t42.trans_date is not null then t42.trans_date end as trans_date, 
+--t41.recs, 
+v2.cbs_decode, v2.current_team, 
+v2.class, v2.mls, v2.bats, v2.throws, 
+convert(nvarchar,v2.height_feet) + '''' + convert(nvarchar,v2.height_inches) as ht, v2.weight as wt,
+v2.interest, v2.ofp, 
+round(dbo.fn_calcage_set_with_decimal (v2.birth_date,convert(datetime,convert(nvarchar,'4/1/2018'))),0) as age, 
+case when v2.injured = 1 then convert(nvarchar,month(v2.dl_date)) + '/' + convert(nvarchar,day(v2.dl_date)) end as dl,
+v2.current_year_int_sort, v2.last_year_int_sort, t.overall_rank_minors,
+t9.overall_milb_rank, t9.overall_milb_rank_mid, t9.overall_milb_rank_mid_blend, t9.overall_milb_rank_mid_stat,
+t22.maj_perc, t22.sum_ct,
+t.tpa, t.wrc_plus, t.avg, t.obp, t.slg, t.ops, t23.ops_att, t.bb_perc, t.so_Perc, t.bb_so_perc, t.iso, t.babip, t.sb, 
+t2.TOTAL_tpa as proj_tpa, t2.avg as proj_avg, t2.obp as proj_obp, t2.slg as proj_slg, t2.ops as proj_ops, t2.bb_perc as proj_bb_perc,
+t2.so_Perc as proj_so_perc, t2.bb_so_perc as proj_bb_so_perc, t2.iso as proj_iso,  t2.sb as proj_sb, 
+t7.tpa, t7.wrc_plus, t7.avg, t7.obp, t7.slg, t7.ops, t7.bb_perc, t7.so_Perc, t7.bb_so_perc, t7.iso, t7.babip, t7.sb,
+t3.hitting_ability_f, t3.power_f, t3.running_speed_f, t3.arm_strength_f, t3.fielding_f,
+t5.hitting_ability_f, t5.power_f, t5.running_speed_f, t5.arm_strength_f, t5.fielding_f,
+t10.running_speed_f, t10.power_f, t10.fielding_f,
+t11.running_speed_f, t11.power_f, t11.fielding_f,
+t8.bip, t8.avg_exit_speed, t8.hard_hit_perc, t8.swing_miss_perc, t8.oz_swing_perc,
+t12.g as g_c, t13.g as g_1b, t14.g as g_2b, t15.g as g_3b, t16.g as g_ss, t17.g as g_lf, t18.g as g_cf, t19.g as g_rf,
+case when isnull(t12.g,0) >= 30 then t12.fld_pct end as fld_pct_c,
+case when isnull(t13.g,0) >= 30 then t13.fld_pct end as fld_pct_1b,
+case when isnull(t14.g,0) >= 30 then t14.fld_pct end as fld_pct_2b,
+case when isnull(t15.g,0) >= 30 then t15.fld_pct end as fld_pct_3b,
+case when isnull(t16.g,0) >= 30 then t16.fld_pct end as fld_pct_ss,
+case when isnull(t17.g,0) >= 30 then t17.fld_pct end as fld_pct_lf,
+case when isnull(t18.g,0) >= 30 then t18.fld_pct end as fld_pct_cf,
+case when isnull(t19.g,0) >= 30 then t19.fld_pct end as fld_pct_rf,
+case when t32.stable_perc >= .5 then t32.runs_saved_per_season_minors end as rsv_c,
+case when t33.stable_perc >= .5 then t33.runs_saved_per_season_minors end as rsv_1B,
+case when t34.stable_perc >= .5 then t34.runs_saved_per_season_minors end as rsv_2B,
+case when t35.stable_perc >= .5 then t35.runs_saved_per_season_minors end as rsv_3B,
+case when t36.stable_perc >= .5 then t36.runs_saved_per_season_minors end as rsv_SS,
+case when t37.stable_perc >= .5 then t37.runs_saved_per_season_minors end as rsv_LF,
+case when t38.stable_perc >= .5 then t38.runs_saved_per_season_minors end as rsv_CF,
+case when t39.stable_perc >= .5 then t39.runs_saved_per_season_minors end as rsv_RF,
+plus_minus_perc_framing_chances as frm,
+t12.pb, t12.ccs_pct
+--into #tmp_hitters_stats
+from vwPlayer_Pro_Full v2, tblRule5 v left outer join 
+tblStats_Batting_Level_Year t on (t.player_code = v.player_code
+and t.year = 2017
+and t.level = 'Minors')
+left outer join tblStats_Batting_Major_Lg_projections t2 on (v.player_code = t2.player_code)
+left outer join tblReport_Pro_Average_Tools t3 on (v.player_code = t3.player_code and t3.year = 2017)
+left outer join tblReport_Pro_Average_Tools t5 on (v.player_code = t5.player_code and t5.year = 2016)
+--left outer join tblStats_Batting_Expected_Fx t4 on (v.player_code = t4.player_code and t4.year = 2017 and t4.leveltype = 'Minors' and t4.venue_name = 'AT&T Park')
+left outer join tblStats_Batting_fx t6 on (v.player_code = t6.player_code and t6.leveltype = 'Minors' and t6.year = 2017)
+left outer join tblStats_Batting_Career t7 on (v.player_code = t7.player_code and t7.level = 'Major League Totals')
+left outer join tblStats_Batting_Pro_Trackman t8 on (v.player_code = t8.player_code and t8.year = 2017 and t8.level = 'Minors')
+left outer join tblStats_Fielding_Last_3_Years_Position t12 on (v.player_code = t12.player_code and t12.level = 'Minors' and t12.pos = 'C')
+left outer join tblStats_Fielding_Last_3_Years_Position t13 on (v.player_code = t13.player_code and t13.level = 'Minors' and t13.pos = '1B')
+left outer join tblStats_Fielding_Last_3_Years_Position t14 on (v.player_code = t14.player_code and t14.level = 'Minors' and t14.pos = '2B')
+left outer join tblStats_Fielding_Last_3_Years_Position t15 on (v.player_code = t15.player_code and t15.level = 'Minors' and t15.pos = '3B')
+left outer join tblStats_Fielding_Last_3_Years_Position t16 on (v.player_code = t16.player_code and t16.level = 'Minors' and t16.pos = 'SS')
+left outer join tblStats_Fielding_Last_3_Years_Position t17 on (v.player_code = t17.player_code and t17.level = 'Minors' and t17.pos = 'LF')
+left outer join tblStats_Fielding_Last_3_Years_Position t18 on (v.player_code = t18.player_code and t18.level = 'Minors' and t18.pos = 'CF')
+left outer join tblStats_Fielding_Last_3_Years_Position t19 on (v.player_code = t19.player_code and t19.level = 'Minors' and t19.pos = 'RF')
+left outer join tblProspect_award_Profile t9 on (v.player_code = t9.player_code and t9.year = 2017)
+left outer join tblStats_Average_Stat_Tools t10 on (t10.player_code = v.player_code and t10.year = 2017)
+left outer join	tblStats_Average_Stat_Tools t11 on (t11.player_code = v.player_code and t11.year = 2016)
+left outer join Scout2.trackman.dbo.tblStats_Catching_Framing_TrackMan t21 on (t21.player_code = v.player_code and t21.level = 'Minors' and t21.year = 2017)
+left outer join tblStats_comps_major_lg_likelihood t22 on (t22.orig_player_code = v.player_code)
+left outer join tblStats_Batting_Expected_TM t23 on (v.player_code = t23.player_code and t23.year = 2017 and t23.level = 'Minors')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t32 on (v.player_code = t32.player_code and t32.pos = 'C')-- and t32.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t33 on (v.player_code = t33.player_code and t33.pos = '1B')--  and t33.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t34 on (v.player_code = t34.player_code and t34.pos = '2B')--  and t34.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t35 on (v.player_code = t35.player_code and t35.pos = '3B')--  and t35.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t36 on (v.player_code = t36.player_code and t36.pos = 'SS')--  and t36.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t37 on (v.player_code = t37.player_code and t37.pos = 'LF')--  and t37.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t38 on (v.player_code = t38.player_code and t38.pos = 'CF')--  and t38.level = 'Total')
+left outer join Scout2.trackman.dbo.tblStats_Fielding_Trackman_last_3_years t39 on (v.player_code = t39.player_code and t39.pos = 'RF')--  and t39.level = 'Total')
+--left outer join #tmp_xxd t40 on (t40.player_code = v.player_code)
+--left outer join #tmp_recs_all t41 on (t41.player_code = v.player_code)
+--left outer join #tmp_release t42 on (t42.player_code = v.player_code)
+--left outer join scout.scouting.dbo.vwPref_list_pro_fo_6yr_full t43 on (v.player_code = t43.player_code and excusion_type is null)
+where v.player_code = v2.player_code
+and v2.position_code <> 'P'
+--and (v.fa_type = 'Minor League' or (v.fa_type = 'Major League' and v2.forty_list = 0))
+and v.player_code = v2.player_code
+and v2.forty_list = 0
+and exists (select 1 from tblStats_Batting_Level_Year t23 where v.player_code = t23.player_code and t23.year >= 2016)
+and v2.roster_status <> 'Vol Ret'
+
+
+
+
+/*
+select t.player_code, t2.g as g_c, t3.g as g_1b, t4.g as g_2b, t5.g as g_3b, t6.g as g_ss, t7.g as g_lf, t8.g as g_cf, t9.g as g_rf
+From #tmp_hitters_stats t left outer join tblStats_Fielding_Last_3_Years_Position t2 on (t.player_code = t2.player_code and t2.level = 'Minors' and t2.pos = 'C')
+left outer join tblStats_Fielding_Last_3_Years_Position t3 on (t.player_code = t3.player_code and t3.level = 'Minors' and t3.pos = '1B')
+left outer join tblStats_Fielding_Last_3_Years_Position t4 on (t.player_code = t4.player_code and t4.level = 'Minors' and t4.pos = '2B')
+left outer join tblStats_Fielding_Last_3_Years_Position t5 on (t.player_code = t5.player_code and t5.level = 'Minors' and t5.pos = '3B')
+left outer join tblStats_Fielding_Last_3_Years_Position t6 on (t.player_code = t6.player_code and t6.level = 'Minors' and t6.pos = 'SS')
+left outer join tblStats_Fielding_Last_3_Years_Position t7 on (t.player_code = t7.player_code and t7.level = 'Minors' and t7.pos = 'LF')
+left outer join tblStats_Fielding_Last_3_Years_Position t8 on (t.player_code = t8.player_code and t8.level = 'Minors' and t8.pos = 'CF')
+left outer join tblStats_Fielding_Last_3_Years_Position t9 on (t.player_code = t9.player_code and t9.level = 'Minors' and t9.pos = 'RF')
+
+select t.player_code, t2.tpa, t2.avg_hit_velo, t2.hh_perc, t3.tpa, t3.avg_hit_velo, t3.hh_perc,
+case when t2.tpa >= 100 and t3.tpa >= 100 and t3.tpa-t2.tpa >= 100 then (t2.avg_hit_velo-t3.avg_hit_velo)/t3.avg_hit_velo end as avg_hit_velo_perc,
+case when t2.tpa >= 100 and t3.tpa >= 100 and t3.tpa-t2.tpa >= 100 then (t2.hh_perc-t3.hh_perc)/t3.hh_perc end as hh_perc
+From #tmp_hitters_stats t left outer join tblStats_Batting_fx t2 on (t.player_code = t2.player_code and t2.year = 2016 and t2.leveltype = 'Minors')
+left outer join tblStats_Batting_fx_Career t3 on (t.player_code = t3.player_code and t3.leveltype = 'Minors')
+*/
+
+-- ALL PITCHERS
+
+
+
+select 
+--row_number() over (partition by case when v2.secondary_pos_1 = 'ST' then v2.throws + 'HS' else v2.throws + 'HR' end 
+--order by case when pref_no is null then 9999 else pref_no end) as pref_rk,
+v2.last_name + ', ' + v2.first_name, v2.player_code, v2.throws + case when v2.secondary_pos_1 = 'ST' then 'HS' else 'HR' end as pos,
+--case when t40.player_code is not null then 'XXD' 
+--when t42.player_code is not null then 'REL'
+--else '6 Yr' end as fa_type, 
+--case when t40.trans_date is not null then t40.trans_date
+--when t42.trans_date is not null then t42.trans_date end as trans_date, 
+--t41.recs, 
+v2.cbs_decode, v2.current_team, v2.class, v2.mls, v2.bats, v2.throws, convert(nvarchar,v2.height_feet) + '''' + convert(nvarchar,v2.height_inches) as ht, v2.weight as wt,
+v2.interest, v2.ofp, 
+round(dbo.fn_calcage_set_with_decimal (v2.birth_date,convert(datetime,convert(nvarchar,'4/1/2018'))),0) as age, 
+case when v2.injured = 1 then convert(nvarchar,month(v2.dl_date)) + '/' + convert(nvarchar,day(v2.dl_date)) end as dl,
+v2.current_year_int_sort, v2.last_year_int_sort,
+t6.overall_rank_minors, 
+t6.overall_milb_rank, t6.overall_milb_rank_mid, t6.overall_milb_rank_mid_blend, t6.overall_milb_rank_mid_stat,
+t.gp, t.gs, t.ip_disp, t.era, t.fip, t.era_minus, t.whip, t.so_9ip_perc, t.bb_9ip_perc, t.so_bb_perc, t.hr_9ip_perc, t.babip, t.go_ao_pct, t19.gb_perc,
+t16.era, t16.fip, t16.so_9ip_perc, t16.bb_9ip_perc, t16.so_bb_perc, t16.hr_9ip_perc,
+t17.gp, t17.gs, t17.ip_disp, t17.era, t17.fip, t17.era_minus, t17.whip, t17.so_9ip_perc, t17.bb_9ip_perc, t17.so_bb_perc, t17.hr_9ip_perc, t17.babip, t17.go_ao_pct,
+t21.opsa as opsa_vl, t22.opsa as opsa_vr,
+t3.fast_ball_f, t3.life_of_fast_ball_f, t3.curve_f, t3.slider_f, t3.change_of_pace_f, t3.other_f, t3.control_f,
+t18.fast_ball_f, t18.life_of_fast_ball_f, t18.curve_f, t18.slider_f, t18.change_of_pace_f, t18.other_f, t18.control_f,
+t7.fb_usage_perc, t7.fb_avg_velo, t20.fb_avg_velo, t7.fb_avg_velo-t20.fb_avg_velo, 
+t7.fb_extension_rating, t7.fb_avg_spin_rating, t7.fb_horz_break, t7.fb_induced_vert_break, 
+case when t7.fb_num >= 25 then t23.swing_miss_perc end as swing_miss_perc_fb,
+t7.cb_usage_perc, t7.cb_avg_velo, t7.cb_avg_spin_rating, t7.cb_horz_break, t7.cb_induced_vert_break, 
+case when t7.cb_num >= 25 then t24.swing_miss_perc  end as swing_miss_perc_cb,
+t7.sl_usage_perc, t7.sl_avg_velo, t7.sl_avg_spin_rating, t7.sl_horz_break, t7.sl_induced_vert_break, 
+case when t7.sl_num >= 25 then t25.swing_miss_perc  end as swing_miss_perc_sl,
+t7.ch_usage_perc, t7.ch_avg_velo, t7.ch_avg_spin_rating, t7.ch_horz_break, t7.ch_induced_vert_break, 
+case when t7.ch_num >= 25 then t26.swing_miss_perc  end as swing_miss_perc_ch,
+t7.fc_usage_perc, t7.fc_avg_velo, t7.fc_avg_spin_rating, t7.fc_horz_break, t7.fc_induced_vert_break, 
+case when t7.fc_num >= 25 then t27.swing_miss_perc  end as swing_miss_perc_fc,
+t4.pitches as tm_pitches_17, t4.stat_tool as grade_17, t4.control_grade as stuff_17, 
+t5.pitches as tm_pitches_16, t5.stat_tool as grade_17, t5.control_grade as stuff_16, 
+t4.stat_tool_vl as grade_lhh, t5.stat_tool_vl as stuff_lhh, 
+t4.stat_tool_vr as grade_rhh, t5.stat_tool_vr as stuff_rhh, 
+t4.fb_grade as grade_fb, t5.fb_grade as stuff_fb, 
+t4.cb_grade as grade_cb, t5.cb_grade as stuff_cb, 
+t4.sl_grade as grade_sl, t5.sl_grade as stuff_sl, 
+t4.ch_grade as grade_ch, t5.ch_grade as stuff_ch, 
+t4.fc_grade as grade_cut, t5.fc_grade as stuff_cut, 
+t4.ot_grade as grade_ot, t5.ot_grade as stuff_ot
+--into #tmp_pitchers_stats
+from scout.scouting.dbo.vwPlayer_Pro_Full v2, tblRule5 v left outer join 
+tblStats_Pitching_Level_Year t on (t.player_code = v.player_code
+and t.year = 2017
+and t.level = 'Minors')
+left outer join tblReport_Pro_Average_Tools t3 on (v.player_code = t3.player_code and t3.year = 2017)
+left outer join tblReport_Pro_Average_Tools t18 on (v.player_code = t18.player_code and t18.year = 2016)
+left outer join tblStats_pitching_Pro_Trackman t4 on (v.player_code = t4.player_code and t4.year = 2017 and t4.level = 'Total')
+left outer join tblStats_pitching_Pro_Trackman t5 on (v.player_code = t5.player_code and t5.year = 2016 and t5.level = 'Total')
+--left outer join tblStats_Pitching_Grades_Pro t4 on (v.player_code = t4.player_code and t4.year = 2017)
+--left outer join tblStats_Pitching_Grades_Pro t5 on (v.player_code = t5.player_code and t5.year = 2016)
+left outer join tblProspect_award_profile t6 on (v.player_code = t6.player_code and t6.year = 2017)
+left outer join tblStats_Pitching_Pro_Trackman t7 on (v.player_code = t7.player_code and t7.year = 2017 and t7.level = 'Minors')
+--left outer join tblSplits_Pitching_Grades_Pro t8 on (v.player_code = t8.player_code and t8.year = 2017 and t8.category = 'Right' and t8.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t9 on (v.player_code = t9.player_code and t9.year = 2017 and t9.category = 'Left' and t9.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t10 on (v.player_code = t10.player_code and t10.year = 2017 and t10.category = 'FB' and t10.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t11 on (v.player_code = t11.player_code and t11.year = 2017 and t11.category = 'CB' and t11.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t12 on (v.player_code = t12.player_code and t12.year = 2017 and t12.category = 'SL' and t12.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t13 on (v.player_code = t13.player_code and t13.year = 2017 and t13.category = 'CH' and t13.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t14 on (v.player_code = t14.player_code and t14.year = 2017 and t14.category = 'FC' and t14.subcategory = 'Total')
+--left outer join tblSplits_Pitching_Grades_Pro t15 on (v.player_code = t15.player_code and t15.year = 2017 and t15.category = 'OT' and t15.subcategory = 'Total')
+left outer join tblStats_Pitching_Major_Lg_Projections t16 on (v.player_code = t16.player_code)
+left outer join tblStats_Pitching_Career t17 on (t17.player_code = v.player_code and t17.level = 'Major League Totals')
+left outer join tblStats_Pitching_FX t19 on (t19.player_code = v.player_code and t19.leveltype = 'Minors' and t19.year = 2017)
+left outer join tblStats_Pitching_Pro_Trackman t20 on (v.player_code = t20.player_code and t20.year = 2016 and t20.level = 'Minors')
+left outer join tblSplits_Giants_Pitching_Career t21 on (t21.player_code = v.player_code and t21.sit_code = 'vl' and t21.level = 'Minors')
+left outer join tblSplits_Giants_Pitching_Career t22 on (t22.player_code = v.player_code and t22.sit_code = 'vr' and t22.level = 'Minors')
+left outer join tblSplits_Pitching_Pro_Trackman t23 on (t23.player_code = v.player_code and t23.year = t7.year and t23.level = t7.level and t23.subcategory = 'Fastball')
+left outer join tblSplits_Pitching_Pro_Trackman t24 on (t24.player_code = v.player_code and t24.year = t7.year and t24.level = t7.level and t24.subcategory = 'Curveball')
+left outer join tblSplits_Pitching_Pro_Trackman t25 on (t25.player_code = v.player_code and t25.year = t7.year and t25.level = t7.level and t25.subcategory = 'Slider')
+left outer join tblSplits_Pitching_Pro_Trackman t26 on (t26.player_code = v.player_code and t26.year = t7.year and t26.level = t7.level and t26.subcategory = 'Changeup')
+left outer join tblSplits_Pitching_Pro_Trackman t27 on (t27.player_code = v.player_code and t27.year = t7.year and t27.level = t7.level and t27.subcategory = 'Cutter')
+--left outer join #tmp_xxd t40 on (t40.player_code = v.player_code)
+--left outer join #tmp_recs_all t41 on (t41.player_code = v.player_code)
+--left outer join #tmp_release t42 on (t42.player_code = v.player_code)
+--left outer join scout.scouting.dbo.vwPref_list_pro_fo_6yr_full t43 on (v.player_code = t43.player_code and excusion_type is null)
+where v.player_code = v2.player_code
+and v2.position_code = 'P'
+--and (v.fa_type = 'Minor League' or (v.fa_type = 'Major League' and v2.forty_list = 0))
+and v.player_code = v2.player_code
+and v2.forty_list = 0
+and exists (select 1 from tblStats_Pitching_Level_Year t23 where v.player_code = t23.player_code and t23.year >= 2016)
+
