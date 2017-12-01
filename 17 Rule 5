@@ -4,6 +4,8 @@ into #tmp_contracts
 from tblContracts_Detail
 where contract_year = 2017
 
+-- TEST TEXT
+
 drop table #tmp_xxd
 drop table #tmp_recs
 drop table #tmp_recs_all
